@@ -908,13 +908,13 @@ Section WithArguments.
       rename H4 into IH2.
       rename H6 into IH12.
       eapply @exec.loop.
+      + eapply IH1.
+        simpl in *.
+        admit. (* true if live on deadAssignment is monotonic wrt used_after *)
+      + unfold compile_post. intros.
+        repeat destr H4.
+        eapply H1.
 
-
-          (* The goal here isn't true; see the helper file for attempts. *)
-        admit.
-      + intros.
-        unfold compile_post in H8.
-        repeat destr H8.
         apply H1 in H9.
         admit. (* easier; apply eval_bcond equality *)
       + intros.

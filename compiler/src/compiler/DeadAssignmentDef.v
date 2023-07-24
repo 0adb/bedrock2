@@ -46,11 +46,40 @@ Section WithArgs.
     | SInteract binds _ args => list_union String.eqb args (list_diff String.eqb used_after binds)
     end.
 
+
+  (* read is the same as live, but without ever
+     removing variables *)
+   Fixpoint read(s: stmt var)(used_after: list var): list var :=
+    match s with
+    | SSet x y
+    | SLoad _ x y _
+    | SInlinetable _ x _ y =>
+        list_union String.eqb [y] used_after
+    | SStore _ a x _ => list_union String.eqb [a; x] used_after
+    | SStackalloc x _ body => read body used_after
+    | SLit x _ => used_after
+    | SOp x _ y z => let var_z := match z with
+                                | Var vz => [vz]
+                                | Const _ => []
+                                end in
+                     list_union String.eqb ([y] ++ var_z) used_after
+    | SIf c s1 s2 => list_union String.eqb
+                       (list_union String.eqb (read s1 used_after) (read s2 used_after))
+                       (accessed_vars_bcond c)
+    | SSeq s1 s2 => read s1 (read s2 used_after)
+    | SLoop s1 c s2 =>
+        read s1 (list_union String.eqb (accessed_vars_bcond c) (list_union String.eqb used_after (read s2 [])))
+    | SSkip => used_after
+    | SCall binds _ args
+    | SInteract binds _ args => list_union String.eqb args used_after
+    end.
+
   Fixpoint deadAssignment(used_after: list var)(s: stmt var) : stmt var :=
     let deadAssignment' := deadAssignment used_after in
     match s with
     | SIf c s1 s2 => SIf c (deadAssignment' s1) (deadAssignment' s2)
-    | SLoop _ _ _ => s
+    | SLoop s1 c s2 => let readVars := read s used_after in
+                       SLoop (deadAssignment readVars s1) c (deadAssignment readVars s2)
     | SStackalloc v1 sz1 s => SStackalloc v1 sz1 (deadAssignment' s)
     | SSeq s1 s2 =>
         let s2' := deadAssignment' s2 in
