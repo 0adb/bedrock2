@@ -74,7 +74,7 @@ Section WithArguments.
        forall sH t m mcH lH postH,
          exec eH sH t m lH mcH postH ->
          forall used_after lL mcL,
-           map.agree_on (of_list (live (deadAssignment used_after sH) used_after)) lH lL
+           map.agree_on (of_list (live' (deadAssignment used_after sH) used_after)) lH lL
            -> exec eL (deadAssignment used_after sH) t m lL mcL (compile_post used_after postH).
   Proof.
     induction 2.
@@ -465,7 +465,7 @@ Section WithArguments.
           destr (existsb (eqb x) used_after)
       end;
       match goal with
-      | H: map.agree_on (of_list (live _ _)) ?l ?lL |- _ =>
+      | H: map.agree_on (of_list (live' _ _)) ?l ?lL |- _ =>
           simpl in H
       end.
       + eapply @exec.lit.
@@ -509,7 +509,7 @@ Section WithArguments.
           destr (existsb (eqb x) used_after)
       end;
       match goal with
-      | H: map.agree_on (of_list (live _ _)) ?l ?lL |- _ =>
+      | H: map.agree_on (of_list (live' _ _)) ?l ?lL |- _ =>
           simpl in H
       end.
       all: try repeat match goal with
@@ -793,7 +793,7 @@ Section WithArguments.
           destr (existsb (eqb x) used_after)
       end;
       match goal with
-      | H: map.agree_on (of_list (live _ _)) ?l ?lL |- _ =>
+      | H: map.agree_on (of_list (live' _ _)) ?l ?lL |- _ =>
           simpl in H
       end.
 
@@ -909,41 +909,106 @@ Section WithArguments.
       rename H6 into IH12.
       eapply @exec.loop.
       + eapply IH1.
-        simpl in *.
-        admit. (* true if live on deadAssignment is monotonic wrt used_after *)
-      + unfold compile_post. intros.
-        repeat destr H4.
-        eapply H1.
+        remember (deadAssignment
+                           (ListSet.list_union eqb
+                              (ListSet.list_union eqb
+                                 (read body1)
+                                 (ListSet.list_union eqb
+                                    (accessed_vars_bcond cond)
+                                    (read body2))) used_after) body2) as body2L.
+        remember (deadAssignment
+                        (ListSet.list_union eqb
+                           (ListSet.list_union eqb
+                              (read body1)
+                              (ListSet.list_union eqb
+                                 (accessed_vars_bcond cond)
+                                 (read body2))) used_after) body1)
+                   as body1L.
+         (* [using live']
+            Same starting goal and IH except replace live with live'.
+            context has:
+            map.agree_on (read body1L \/
+                          read body2L \/
+                          accessed_vars_bcond cond \/
+                          used_after) l lL
+            new goal has:
+            map.agree_on (live' body1L
+                           (read body1 \/
+                            accessed_vars_bcond cond \/
+                            read body2 \/ used_after) l lL
 
-        apply H1 in H9.
-        admit. (* easier; apply eval_bcond equality *)
-      + intros.
-        unfold compile_post in *.
-        inversion H9.
-        repeat destr H8.
-        eapply H2 in H10.
-        2: admit. (* followes from accessed_vars_bcond *)
-        exists x. eexists.
-        split; admit. (* follows from assumptions *)
-      + intros.
-        unfold compile_post in H8.
-        repeat destr H8.
-        eapply H4 in H10.
-        2: admit. (* follows from accessed_vars_bcond *)
-        * eapply H10.
-        * admit. (* goal here also might be untrue *)
-      +  intros.
-         unfold compile_post in * .
-         repeat destr H8.
-         eapply H6 in H9.
-         * eapply H9.
-         * admit.  (* unsure *)
-    -
+            where:
+               liveVars = (ListSet.list_union eqb
+                   (ListSet.list_union eqb (read body1)
+                      (ListSet.list_union eqb
+                         (accessed_vars_bcond cond)
+                         (read body2))) used_after)
+               body2L = deadAssignment liveVars body2
+               body1L = deadAssignment liveVars body1
+
+*)
 
 
-        eexists. split.
-        * admit.
-        *
+        (* [using live instead of live']
+
+
+        remember ((ListSet.list_union eqb
+             (ListSet.list_union eqb (read body1)
+                (ListSet.list_union eqb (accessed_vars_bcond cond)
+                   (read body2))) used_after)) as liveVars1.
+        remember ((ListSet.list_union eqb (accessed_vars_bcond cond)
+                  (ListSet.list_union eqb used_after
+                     (live (deadAssignment liveVars1 body2) [])))) as liveVars2.
+        remember ((deadAssignment
+                  (ListSet.list_union eqb
+                     (ListSet.list_union eqb
+                        (read body1)
+                        (ListSet.list_union eqb
+                           (accessed_vars_bcond cond)
+                           (read body2))) used_after) body1)) as body1L.
+           Goal:
+           exec eL
+                (deadAssignment bigVariableSet body1)
+                t m lL mcL ??
+
+           Relevant hypothesis: IH1
+           forall (used_after : list string) (lL : locals)
+                  (mcL : MetricLog),
+                  map.agree_on
+                  (of_list (live
+                           (deadAssignment used_after body1)
+                           used_after)) l lL ->
+                  exec eL (deadAssignment used_after body1) t m lL mcL
+                  (compile_post used_after mid1)
+
+           eapply IH1 gives goal:
+              map.agree_on (of_list (live body1L liveVars2)) l lL
+           context has:
+              map.agree_on (of_list (live body1L liveVars1) l lL
+
+           where:
+              liveVars1 =
+                 used_after \/
+                 accessed_vars_bcond cond \/
+                 read body1 \/
+                 read body2
+
+              liveVars2 =
+                 used_after \/
+                 accessed_vars_bcond cond \/
+                 (live (deadAssignment liveVars1 body2) [])
+
+              body1L =
+                 deadAssignment liveVars1 body1
+        remember ((ListSet.list_union eqb
+             (ListSet.list_union eqb (read body1)
+                (ListSet.list_union eqb (accessed_vars_bcond cond)
+                   (read body2))) used_after)) as liveVars1.
+        remember ((ListSet.list_union eqb (accessed_vars_bcond cond)
+                  (ListSet.list_union eqb used_after
+                     (live (deadAssignment liveVars1 body2) [])))) as liveVars2.
+
+         *)
 
     13: {
       intros.
