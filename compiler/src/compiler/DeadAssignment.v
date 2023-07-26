@@ -924,30 +924,6 @@ Section WithArguments.
                                  (accessed_vars_bcond cond)
                                  (read body2))) used_after) body1)
                    as body1L.
-         (* [using live']
-            Same starting goal and IH except replace live with live'.
-            context has:
-            map.agree_on (read body1L \/
-                          read body2L \/
-                          accessed_vars_bcond cond \/
-                          used_after) l lL
-            new goal has:
-            map.agree_on (live' body1L
-                           (read body1 \/
-                            accessed_vars_bcond cond \/
-                            read body2 \/ used_after) l lL
-
-            where:
-               liveVars = (ListSet.list_union eqb
-                   (ListSet.list_union eqb (read body1)
-                      (ListSet.list_union eqb
-                         (accessed_vars_bcond cond)
-                         (read body2))) used_after)
-               body2L = deadAssignment liveVars body2
-               body1L = deadAssignment liveVars body1
-
-*)
-
 
         (* [using live instead of live']
 
@@ -1010,6 +986,30 @@ Section WithArguments.
 
          *)
 
+
+         (* [using live']
+            Same starting goal and IH except replace live with live'.
+            context has:
+            map.agree_on (read body1L \/
+                          read body2L \/
+                          accessed_vars_bcond cond \/
+                          used_after) l lL
+            new goal has:
+            map.agree_on (live' body1L
+                           (read body1 \/
+                            accessed_vars_bcond cond \/
+                            read body2 \/ used_after) l lL
+
+            where:
+               liveVars = (ListSet.list_union eqb
+                   (ListSet.list_union eqb (read body1)
+                      (ListSet.list_union eqb
+                         (accessed_vars_bcond cond)
+                         (read body2))) used_after)
+               body2L = deadAssignment liveVars body2
+               body1L = deadAssignment liveVars body1
+
+*)
     13: {
       intros.
       simpl.
