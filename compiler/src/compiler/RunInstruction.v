@@ -92,9 +92,10 @@ Section Run.
 
   Context {width} {BW: Bitwidth width} {word: word.word width} {word_ok: word.ok word}.
   Context {Registers: map.map Z word}.
+  Context {VRegisters: map.map Z (list w8)}.
   Context {mem: map.map word byte}.
   Context {mem_ok: map.ok mem}.
-
+ 
   Add Ring wring : (word.ring_theory (word := word))
       (preprocess [autorewrite with rew_word_morphism],
        morphism (word.ring_morph (word := word)),
@@ -142,6 +143,7 @@ Section Run.
       valid_machine initialL ->
       mcomp_sat (run1 iset) initialL (fun (finalL: RiscvMachineL) =>
         finalL.(getRegs) = initialL.(getRegs) /\
+        finalL.(getRegs) = initialL.(getRegs) /\
         finalL.(getLog) = initialL.(getLog) /\
         finalL.(getMem) = initialL.(getMem) /\
         finalL.(getXAddrs) = initialL.(getXAddrs) /\
@@ -161,6 +163,7 @@ Section Run.
       valid_machine initialL ->
       mcomp_sat (run1 iset) initialL (fun finalL =>
         finalL.(getRegs) = map.put initialL.(getRegs) rd initialL.(getNextPc) /\
+        finalL.(getVRegs) = initialL.(getVRegs) /\
         finalL.(getLog) = initialL.(getLog) /\
         finalL.(getMem) = initialL.(getMem) /\
         finalL.(getXAddrs) = initialL.(getXAddrs) /\
@@ -178,6 +181,7 @@ Section Run.
       valid_machine initialL ->
       mcomp_sat (run1 iset) initialL (fun finalL =>
         finalL.(getRegs) = initialL.(getRegs) /\
+        finalL.(getVRegs) = initialL.(getVRegs) /\
         finalL.(getLog) = initialL.(getLog) /\
         finalL.(getMem) = initialL.(getMem) /\
         finalL.(getXAddrs) = initialL.(getXAddrs) /\
@@ -200,6 +204,7 @@ Section Run.
       mcomp_sat (run1 iset) initialL (fun finalL =>
         finalL.(getRegs) = map.put initialL.(getRegs) rd (f rs_val (word.of_Z imm)) /\
         finalL.(getLog) = initialL.(getLog) /\
+        finalL.(getVRegs) = initialL.(getVRegs) /\
         finalL.(getMem) = initialL.(getMem) /\
         finalL.(getXAddrs) = initialL.(getXAddrs) /\
         finalL.(getPc) = initialL.(getNextPc) /\
@@ -248,6 +253,7 @@ Section Run.
       valid_machine initialL ->
       mcomp_sat (run1 iset) initialL (fun finalL =>
         finalL.(getRegs) = initialL.(getRegs) /\
+        finalL.(getVRegs) = initialL.(getVRegs) /\
         finalL.(getLog) = initialL.(getLog) /\
         subset (footpr Exec) (of_list (finalL.(getXAddrs))) /\
         (Exec * ptsto_bytes n addr (LittleEndian.split n (word.unsigned v_new)) * R)%sep
@@ -438,4 +444,26 @@ Section Run.
   Lemma run_Sd: run_Store_spec 8 Sd.
   Proof. t. Qed.
 
+  Lemma run_Vlr: 
+    forall (addr: word) (n: nat) v (vd rs1: Z) (nf nf': Z) (initialL: RiscvMachineL) (Exec R Rexec: mem -> Prop),
+      (* valid_register almost follows from verify except for when the register is Register0 *)
+      valid_vregister vd ->
+      valid_register rs1 ->
+      initialL.(getNextPc) = word.add initialL.(getPc) (word.of_Z 4) ->
+      map.get initialL.(getRegs) rs1 = Some addr ->
+      subset (footpr Exec) (of_list (initialL.(getXAddrs))) ->
+      iff1 Exec (program iset initialL.(getPc) [[(VInstruction (Vlr vd rs1 nf)) ]] * Rexec)%sep ->
+      (Exec * ptsto_bytes n addr v * R)%sep initialL.(getMem) ->
+      ExecuteV.translateNumFields nf = Some nf' ->
+      valid_machine initialL ->
+      mcomp_sat (run1 iset) initialL (fun finalL =>
+        finalL.(getRegs) =  initialL.(getRegs) /\
+        finalL.(getLog) = initialL.(getLog) /\
+        finalL.(getMem) = initialL.(getMem) /\
+        finalL.(getXAddrs) = initialL.(getXAddrs) /\
+        finalL.(getPc) = initialL.(getNextPc) /\
+        finalL.(getNextPc) = word.add finalL.(getPc) (word.of_Z 4) /\
+        finalL.(getMetrics) = addMetricInstructions 1 (addMetricLoads 2 initialL.(getMetrics)) /\
+          valid_machine finalL).
+  Proof. t. rewrite H6 in *. simpl in *. Abort.
 End Run.

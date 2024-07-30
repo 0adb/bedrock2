@@ -35,6 +35,7 @@ Import Utility.
 Section Go.
   Context {width} {BW: Bitwidth width} {word: word.word width} {word_ok: word.ok word}.
   Context {Registers: map.map Z word}.
+  Context {VRegisters: map.map Z (list w8)}. 
   Context {mem: map.map word byte}.
   Context {mem_ok: map.ok mem}.
 
@@ -177,6 +178,24 @@ Section Go.
       mcomp_sat (Bind (setRegister Register0 v) f) initialL post.
   Proof. t spec_setRegister. Qed.
 
+  
+  Lemma go_getVRegister: forall (initialL: RiscvMachineL) (x: Z) v post (f: (list w8) -> M unit),
+      valid_vregister x ->
+      map.get initialL.(getVRegs) x = Some v ->
+      mcomp_sat (f v) initialL post ->
+      mcomp_sat (Bind (getVRegister x) f) initialL post.
+  Proof. t spec_getVRegister. Qed.
+
+  
+  Lemma go_setVRegister: forall (initialL: RiscvMachineL) x v post (f: unit -> M unit),
+      valid_vregister x ->
+      valid_vregister_value v ->
+      mcomp_sat (f tt) (withVRegs (map.put initialL.(getVRegs) x v) initialL) post ->
+      mcomp_sat (Bind (setVRegister x v) f) initialL post.
+  Proof. t spec_setVRegister. Qed.
+
+
+  
   Lemma go_loadByte: forall (initialL: RiscvMachineL) addr (v: w8) (f: w8 -> M unit) post,
       Memory.loadByte initialL.(getMem) addr = Some v ->
       mcomp_sat (f v) (updateMetrics (addMetricLoads 1) initialL) post ->
@@ -708,6 +727,8 @@ Section Go.
       eapply preserve_subset_of_xAddrs; eassumption.
   Qed.
 
+    
+
 End Go.
 
 Ltac simpl_MetricRiscvMachine_get_set :=
@@ -717,12 +738,14 @@ Ltac simpl_MetricRiscvMachine_get_set :=
      getMachine
      getMetrics
      getRegs
+     getVRegs
      getPc
      getNextPc
      getMem
      getXAddrs
      getLog
      withRegs
+     withVRegs
      withPc
      withNextPc
      withMem
@@ -731,6 +754,7 @@ Ltac simpl_MetricRiscvMachine_get_set :=
      withLogItem
      withLogItems
      RiscvMachine.withRegs
+     RiscvMachine.withVRegs
      RiscvMachine.withPc
      RiscvMachine.withNextPc
      RiscvMachine.withMem
@@ -827,6 +851,8 @@ Ltac simulate_step :=
         | refine (go_setRegister0 _ _ _ _ _);      [sidecondition..|]
         | refine (go_getRegister _ _ _ _ _ _ _ _); [sidecondition..|]
         | refine (go_setRegister _ _ _ _ _ _ _);   [sidecondition..|]
+        | refine (go_getVRegister _ _ _ _ _ _ _ _); [sidecondition..|]
+        | refine (go_setVRegister _ _ _ _ _ _ _);   [sidecondition..|]
         (* Note: One might not want these, but the separation logic version, or
            the version expressed in terms of compile_load/store, so they're commented out
         | eapply go_loadByte       ; [sidecondition..|]
